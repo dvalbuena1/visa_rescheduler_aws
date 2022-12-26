@@ -8,6 +8,8 @@ MY_SCHEDULE_DATE = 2024-01-01
 COUNTRY_CODE = es-co
 ; Bogotá
 FACILITY_ID = 25
+; Bogotá
+CAS_ID = 26
 
 [CHROMEDRIVER]
 ; Details for the script to control Chrome

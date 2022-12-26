@@ -1,6 +1,6 @@
 # -*- coding: utf8 -*-
 
-import time
+import time as tm
 import json
 import random
 import platform
@@ -28,6 +28,7 @@ SCHEDULE_ID = config['USVISA']['SCHEDULE_ID']
 MY_SCHEDULE_DATE = config['USVISA']['MY_SCHEDULE_DATE']
 COUNTRY_CODE = config['USVISA']['COUNTRY_CODE'] 
 FACILITY_ID = config['USVISA']['FACILITY_ID']
+CAS_ID = config['USVISA']['CAS_ID']
 
 SENDGRID_API_KEY = config['SENDGRID']['SENDGRID_API_KEY']
 PUSH_TOKEN = config['PUSHOVER']['PUSH_TOKEN']
@@ -40,16 +41,19 @@ REGEX_CONTINUE = "//a[contains(text(),'Continuar')]"
 
 
 # def MY_CONDITION(month, day): return int(month) == 11 and int(day) >= 5
-def MY_CONDITION(month, day): return True # No custom condition wanted for the new scheduled date
+def MY_CONDITION(month, day): return True  # No custom condition wanted for the new scheduled date
+
 
 STEP_TIME = 0.5  # time between steps (interactions with forms): 0.5 seconds
-RETRY_TIME = 60*10  # wait time between retries/checks for available dates: 10 minutes
-EXCEPTION_TIME = 60*30  # wait time when an exception occurs: 30 minutes
-COOLDOWN_TIME = 60*60  # wait time when temporary banned (empty list): 60 minutes
+RETRY_TIME = 60 * 10  # wait time between retries/checks for available dates: 10 minutes
+EXCEPTION_TIME = 60 * 30  # wait time when an exception occurs: 30 minutes
+COOLDOWN_TIME = 60 * 60  # wait time when temporary banned (empty list): 60 minutes
 
 DATE_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/days/{FACILITY_ID}.json?appointments[expedite]=false"
-TIME_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{FACILITY_ID}.json?date=%s&appointments[expedite]=false"
+TIME_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{FACILITY_ID}.json?date={{date}}&appointments[expedite]=false"
 APPOINTMENT_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment"
+DATE_URL_CAS = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/days/{CAS_ID}.json?&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
+TIME_URL_CAS = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{CAS_ID}.json?date={{date_cas}}&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
 EXIT = False
 
 
@@ -88,27 +92,28 @@ def get_driver():
         dr = webdriver.Remote(command_executor=HUB_ADDRESS, options=webdriver.ChromeOptions())
     return dr
 
+
 driver = get_driver()
 
 
 def login():
     # Bypass reCAPTCHA
     driver.get(f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv")
-    time.sleep(STEP_TIME)
+    tm.sleep(STEP_TIME)
     a = driver.find_element(By.XPATH, '//a[@class="down-arrow bounce"]')
     a.click()
-    time.sleep(STEP_TIME)
+    tm.sleep(STEP_TIME)
 
     print("Login start...")
     href = driver.find_element(By.XPATH, '//*[@id="header"]/nav/div[2]/div[1]/ul/li[3]/a')
     href.click()
-    time.sleep(STEP_TIME)
+    tm.sleep(STEP_TIME)
     Wait(driver, 60).until(EC.presence_of_element_located((By.NAME, "commit")))
 
     print("\tclick bounce")
     a = driver.find_element(By.XPATH, '//a[@class="down-arrow bounce"]')
     a.click()
-    time.sleep(STEP_TIME)
+    tm.sleep(STEP_TIME)
 
     do_login_action()
 
@@ -117,22 +122,22 @@ def do_login_action():
     print("\tinput email")
     user = driver.find_element(By.ID, 'user_email')
     user.send_keys(USERNAME)
-    time.sleep(random.randint(1, 3))
+    tm.sleep(random.randint(1, 3))
 
     print("\tinput pwd")
     pw = driver.find_element(By.ID, 'user_password')
     pw.send_keys(PASSWORD)
-    time.sleep(random.randint(1, 3))
+    tm.sleep(random.randint(1, 3))
 
     print("\tclick privacy")
     box = driver.find_element(By.CLASS_NAME, 'icheckbox')
-    box .click()
-    time.sleep(random.randint(1, 3))
+    box.click()
+    tm.sleep(random.randint(1, 3))
 
     print("\tcommit")
     btn = driver.find_element(By.NAME, 'commit')
     btn.click()
-    time.sleep(random.randint(1, 3))
+    tm.sleep(random.randint(1, 3))
 
     Wait(driver, 60).until(
         EC.presence_of_element_located((By.XPATH, REGEX_CONTINUE)))
@@ -151,7 +156,7 @@ def get_date():
 
 
 def get_time(date):
-    time_url = TIME_URL % date
+    time_url = TIME_URL.format(date=date)
     driver.get(time_url)
     content = driver.find_element(By.TAG_NAME, 'pre').text
     data = json.loads(content)
@@ -160,21 +165,32 @@ def get_time(date):
     return time
 
 
-def reschedule(date):
+def reschedule(date, time, cas_date, cas_time):
     global EXIT
     print(f"Starting Reschedule ({date})")
 
-    time = get_time(date)
     driver.get(APPOINTMENT_URL)
+
+    tm.sleep(STEP_TIME)
+    btn = driver.find_element(By.XPATH, '//*[@id="main"]/div[3]/form/div[2]/div/input')
+    if btn is not None:
+        print("\tmultiple applicants")
+        btn.click()
 
     data = {
         "utf8": driver.find_element(by=By.NAME, value='utf8').get_attribute('value'),
         "authenticity_token": driver.find_element(by=By.NAME, value='authenticity_token').get_attribute('value'),
-        "confirmed_limit_message": driver.find_element(by=By.NAME, value='confirmed_limit_message').get_attribute('value'),
-        "use_consulate_appointment_capacity": driver.find_element(by=By.NAME, value='use_consulate_appointment_capacity').get_attribute('value'),
+        "confirmed_limit_message": driver.find_element(by=By.NAME, value='confirmed_limit_message').get_attribute(
+            'value'),
+        "use_consulate_appointment_capacity": driver.find_element(by=By.NAME,
+                                                                  value='use_consulate_appointment_capacity').get_attribute(
+            'value'),
         "appointments[consulate_appointment][facility_id]": FACILITY_ID,
         "appointments[consulate_appointment][date]": date,
         "appointments[consulate_appointment][time]": time,
+        "appointments[asc_appointment][facility_id]": CAS_ID,
+        "appointments[asc_appointment][date]": cas_date,
+        "appointments[asc_appointment][time]": cas_time
     }
 
     headers = {
@@ -184,18 +200,55 @@ def reschedule(date):
     }
 
     r = requests.post(APPOINTMENT_URL, headers=headers, data=data)
-    if(r.text.find('Successfully Scheduled') != -1):
+    if r.status_code == 200:
         msg = f"Rescheduled Successfully! {date} {time}"
         send_notification(msg)
         EXIT = True
     else:
         msg = f"Reschedule Failed. {date} {time}"
         send_notification(msg)
+        print(r.status_code)
+        print(r.text)
+
+
+def cas_availability(date, time):
+    print("CAS Availability")
+
+    def get_date():
+        driver.get(DATE_URL_CAS.format(date=date, time=time))
+        if not is_logged_in():
+            login()
+            return get_date()
+        else:
+            content = driver.find_element(By.TAG_NAME, 'pre').text
+            return json.loads(content)
+
+    def get_available_date(dates):
+        for d in dates:
+            date = d.get('date')
+            _, month, day = date.split('-')
+            if MY_CONDITION(month, day):
+                return date
+
+    def get_time(date_cas):
+        time_url = TIME_URL_CAS.format(date_cas=date_cas, date=date, time=time)
+        driver.get(time_url)
+        content = driver.find_element(By.TAG_NAME, 'pre').text
+        data = json.loads(content)
+        available_time = data.get("available_times")[-1]
+        print(f"\tGot time successfully! {date_cas} {available_time}")
+        return available_time
+
+    dates = get_date()[:5]
+    available_date = get_available_date(dates)
+    available_time = get_time(available_date)
+
+    return available_date, available_time
 
 
 def is_logged_in():
     content = driver.page_source
-    if(content.find("error") != -1):
+    if content.find("error") != -1:
         return False
     return True
 
@@ -225,7 +278,7 @@ def get_available_date(dates):
         date = d.get('date')
         if is_earlier(date) and date != last_seen:
             _, month, day = date.split('-')
-            if(MY_CONDITION(month, day)):
+            if MY_CONDITION(month, day):
                 last_seen = date
                 return date
 
@@ -237,7 +290,7 @@ def push_notification(dates):
     send_notification(msg)
 
 
-if __name__ == "__main__":
+def main():
     login()
     retry_count = 0
     while 1:
@@ -259,24 +312,30 @@ if __name__ == "__main__":
             print()
             print(f"New date: {date}")
             if date:
-                reschedule(date)
+                date_time = get_time(date)
+                cas_date, cas_time = cas_availability(date, date_time)
+                reschedule(date, date_time, cas_date, cas_time)
                 push_notification(dates)
 
-            if(EXIT):
+            if EXIT:
                 print("------------------exit")
                 break
 
             if not dates:
               msg = "List is empty"
               send_notification(msg)
-              #EXIT = True
-              time.sleep(COOLDOWN_TIME)
+                # EXIT = True
+                tm.sleep(COOLDOWN_TIME)
             else:
-              time.sleep(RETRY_TIME)
+                tm.sleep(RETRY_TIME)
 
         except:
             retry_count += 1
-            time.sleep(EXCEPTION_TIME)
+            tm.sleep(EXCEPTION_TIME)
 
-    if(not EXIT):
+    if not EXIT:
         send_notification("HELP! Crashed.")
+
+
+if __name__ == "__main__":
+    main()
