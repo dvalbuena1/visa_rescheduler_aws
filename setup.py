@@ -12,15 +12,14 @@ def as_loop():
         handler = VisaScheduler()
         result = handler.main()
 
-        match result:
-            case Result.SUCCESS:
-                break
-            case Result.RETRY:
+        if result == Result.RETRY:
                 time.sleep(RETRY_TIME)
-            case Result.COOLDOWN:
+        elif result == Result.COOLDOWN:
                 time.sleep(COOLDOWN_TIME)
-            case Result.EXCEPTION:
+        elif result == Result.EXCEPTION:
                 time.sleep(EXCEPTION_TIME)
+        else:
+            break
 
 
 if __name__ == '__main__':

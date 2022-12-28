@@ -13,7 +13,7 @@ from selenium.webdriver.edge.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as Wait
 from selenium.webdriver.common.by import By
-from webdriver_manager.microsoft import IEDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
@@ -216,7 +216,7 @@ class VisaScheduler:
     @staticmethod
     def get_driver():
         if LOCAL_USE:
-            dr = webdriver.Edge(service=Service())
+            dr = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()))
         else:
             dr = webdriver.Remote(command_executor=HUB_ADDRESS, options=webdriver.EdgeOptions())
         return dr
