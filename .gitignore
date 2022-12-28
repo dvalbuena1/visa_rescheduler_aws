@@ -1,2 +1,6 @@
 config.ini
 .idea
+
+__pycache__/
+*.py[cod]
+*$py.class
