@@ -1,4 +1,5 @@
 import time
+import subprocess
 
 from visa import VisaScheduler, Result
 
@@ -13,15 +14,18 @@ def as_loop():
         result = handler.main()
 
         if result == Result.RETRY:
-                time.sleep(RETRY_TIME)
+            time.sleep(RETRY_TIME)
         elif result == Result.COOLDOWN:
-                time.sleep(COOLDOWN_TIME)
+            time.sleep(COOLDOWN_TIME)
         elif result == Result.EXCEPTION:
-                time.sleep(EXCEPTION_TIME)
+            time.sleep(EXCEPTION_TIME)
         else:
             break
 
 
+def as_lambda_function():
+    subprocess.run(["sls", "deploy"], shell=True)
+
+
 if __name__ == '__main__':
-    h = VisaScheduler()
-    h.main()
+    as_lambda_function()

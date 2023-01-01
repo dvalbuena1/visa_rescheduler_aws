@@ -1,5 +1,6 @@
 config.ini
 .idea
+.serverless
 
 __pycache__/
 *.py[cod]

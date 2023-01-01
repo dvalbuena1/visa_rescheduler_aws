@@ -1,22 +1,21 @@
 # -*- coding: utf8 -*-
-
-import time as tm
+import configparser
 import json
 import random
-import configparser
+import time as tm
 from datetime import datetime
 from enum import Enum
+from tempfile import mkdtemp
 
 import requests
 from selenium import webdriver
-from selenium.webdriver.edge.service import Service
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as Wait
-from selenium.webdriver.common.by import By
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
-
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from webdriver_manager.chrome import ChromeDriverManager
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -33,7 +32,7 @@ SENDGRID_API_KEY = config['SENDGRID']['SENDGRID_API_KEY']
 PUSH_TOKEN = config['PUSHOVER']['PUSH_TOKEN']
 PUSH_USER = config['PUSHOVER']['PUSH_USER']
 
-LOCAL_USE = config['CHROMEDRIVER'].getboolean('LOCAL_USE')
+USE = config['CHROMEDRIVER']['USE']
 HUB_ADDRESS = config['CHROMEDRIVER']['HUB_ADDRESS']
 
 REGEX_CONTINUE = "//a[contains(text(),'Continuar')]"
@@ -52,6 +51,12 @@ class Result(Enum):
     RETRY = 2
     COOLDOWN = 3
     EXCEPTION = 4
+
+
+class Use(Enum):
+    AWS = "AWS"
+    LOCAL = "LOCAL"
+    REMOTE = "REMOTE"
 
 
 class VisaScheduler:
@@ -215,10 +220,27 @@ class VisaScheduler:
 
     @staticmethod
     def get_driver():
-        if LOCAL_USE:
-            dr = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()))
-        else:
-            dr = webdriver.Remote(command_executor=HUB_ADDRESS, options=webdriver.EdgeOptions())
+        dr = None
+        if USE == Use.LOCAL.value:
+            dr = webdriver.Edge(service=Service(ChromeDriverManager().install()))
+        elif USE == Use.AWS.value:
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.binary_location = "/opt/chrome/chrome"
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--window-size=1280x1696')
+            chrome_options.add_argument('--single-process')
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-dev-tools")
+            chrome_options.add_argument("--no-zygote")
+            chrome_options.add_argument('--ignore-certificate-errors')
+            chrome_options.add_argument(f'--user-data-dir={mkdtemp()}')
+            chrome_options.add_argument(f'--data-path={mkdtemp()}')
+            chrome_options.add_argument(f'--disk-cache-dir={mkdtemp()}')
+            dr = webdriver.Chrome(service=Service(executable_path="/opt/chromedriver"), options=chrome_options)
+        elif USE == Use.REMOTE.value:
+            dr = webdriver.Remote(command_executor=HUB_ADDRESS, options=webdriver.ChromeOptions())
         return dr
 
     @staticmethod
@@ -313,3 +335,8 @@ class VisaScheduler:
             result = Result.EXCEPTION
 
         return result
+
+
+def lambda_handler(event=None, context=None):
+    handler = VisaScheduler()
+    handler.main()
