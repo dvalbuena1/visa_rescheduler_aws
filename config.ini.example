@@ -3,7 +3,6 @@
 USERNAME = example@example.com
 PASSWORD = xxxxxxxxxx
 SCHEDULE_ID = 99999999
-MY_SCHEDULE_DATE = 2024-01-01
 ; Spanish - Colombia
 COUNTRY_CODE = es-co
 ; Bogotá
@@ -12,9 +11,9 @@ FACILITY_ID = 25
 CAS_ID = 26
 
 [CHROMEDRIVER]
-; Details for the script to control Chrome
-LOCAL_USE = True
-; Optional: HUB_ADDRESS is mandatory only when LOCAL_USE = False
+; Way to use selenium LOCAL, AWS or REMOTE
+USE = AWS
+; Optional: HUB_ADDRESS is mandatory only when USE = REMOTE
 HUB_ADDRESS = http://localhost:9515/wd/hub
 
 [PUSHOVER]

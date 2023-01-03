@@ -2,10 +2,12 @@
 import configparser
 import json
 import random
+import re
 import time as tm
 from datetime import datetime
 from enum import Enum
 from tempfile import mkdtemp
+import locale
 
 import requests
 from selenium import webdriver
@@ -16,6 +18,7 @@ from selenium.webdriver.support.ui import WebDriverWait as Wait
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -23,7 +26,6 @@ config.read('config.ini')
 USERNAME = config['USVISA']['USERNAME']
 PASSWORD = config['USVISA']['PASSWORD']
 SCHEDULE_ID = config['USVISA']['SCHEDULE_ID']
-MY_SCHEDULE_DATE = config['USVISA']['MY_SCHEDULE_DATE']
 COUNTRY_CODE = config['USVISA']['COUNTRY_CODE']
 FACILITY_ID = config['USVISA']['FACILITY_ID']
 CAS_ID = config['USVISA']['CAS_ID']
@@ -45,6 +47,11 @@ APPOINTMENT_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCH
 DATE_URL_CAS = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/days/{CAS_ID}.json?&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
 TIME_URL_CAS = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{CAS_ID}.json?date={{date_cas}}&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
 
+code = COUNTRY_CODE.split("-")
+code[1] = code[1].upper()
+code = str.join("_", code)
+locale.setlocale(locale.LC_ALL, f'{code}.UTF-8')
+
 
 class Result(Enum):
     SUCCESS = 1
@@ -62,11 +69,19 @@ class Use(Enum):
 class VisaScheduler:
     def __init__(self):
         self.driver = self.get_driver()
+        self.my_schedule_date = None
 
     # def MY_CONDITION(month, day): return int(month) == 11 and int(day) >= 5
     @staticmethod
     def MY_CONDITION(month, day):
         return True  # No custom condition wanted for the new scheduled date
+
+    def get_my_schedule_date(self):
+        appointment = self.driver.find_element(By.XPATH,
+                                               '//*[@id="main"]/div[2]/div[3]/div[1]/div/div[1]/div[2]/p[1]').text
+        regex = r".+: (.+,.+),.+"
+        date = re.search(regex, appointment).group(1)
+        self.my_schedule_date = datetime.strptime(date, "%d %B, %Y").strftime("%Y-%m-%d")
 
     def login(self):
         # Bypass reCAPTCHA
@@ -222,7 +237,7 @@ class VisaScheduler:
     def get_driver():
         dr = None
         if USE == Use.LOCAL.value:
-            dr = webdriver.Edge(service=Service(ChromeDriverManager().install()))
+            dr = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()))
         elif USE == Use.AWS.value:
             chrome_options = webdriver.ChromeOptions()
             chrome_options.binary_location = "/opt/chrome/chrome"
@@ -243,11 +258,10 @@ class VisaScheduler:
             dr = webdriver.Remote(command_executor=HUB_ADDRESS, options=webdriver.ChromeOptions())
         return dr
 
-    @staticmethod
-    def get_available_date(dates):
+    def get_available_date(self, dates):
 
         def is_earlier(date):
-            my_date = datetime.strptime(MY_SCHEDULE_DATE, "%Y-%m-%d")
+            my_date = datetime.strptime(self.my_schedule_date, "%Y-%m-%d")
             new_date = datetime.strptime(date, "%Y-%m-%d")
             result = my_date > new_date
             print(f'Is {my_date} > {new_date}:\t{result}')
@@ -311,6 +325,7 @@ class VisaScheduler:
 
         self.login()
         try:
+            self.get_my_schedule_date()
             dates = self.get_date()[:5]
             if dates:
                 self.print_dates(dates)
@@ -339,4 +354,4 @@ class VisaScheduler:
 
 def lambda_handler(event=None, context=None):
     handler = VisaScheduler()
-    handler.main()
+    print(handler.main())
