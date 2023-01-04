@@ -2,6 +2,14 @@ service: visa-rescheduler-lambda
 
 provider:
   name: aws
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: 'events:PutRule'
+          Resource: "arn:aws:events:*:*:rule/visa-rescheduler-lambda*"
+
+
   stage: ${opt:stage, 'prod'}
   region: ${env:AWS_REGION, 'us-east-1'}
   ecr:
@@ -11,9 +19,12 @@ provider:
         platform: linux/amd64
 
 functions:
-  demo:
+  main:
     timeout: 60
-    # If you experience any errors such as Chrome crashing or not being available you might need to increase the storage available to your Lambda Function. See #102
+    # If you experience any errors such as Chrome crashing or not being available you might need to increase the storage available to your Lambda Function.
     memorySize: 2048
     image:
       name: img
+    events:
+      - eventBridge:
+          schedule: rate(10 minutes)

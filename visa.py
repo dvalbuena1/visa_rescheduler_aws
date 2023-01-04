@@ -1,13 +1,13 @@
 # -*- coding: utf8 -*-
 import configparser
 import json
+import locale
 import random
 import re
 import time as tm
 from datetime import datetime
 from enum import Enum
 from tempfile import mkdtemp
-import locale
 
 import requests
 from selenium import webdriver
@@ -18,7 +18,8 @@ from selenium.webdriver.support.ui import WebDriverWait as Wait
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
+
+from utils import Result
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -51,13 +52,6 @@ code = COUNTRY_CODE.split("-")
 code[1] = code[1].upper()
 code = str.join("_", code)
 locale.setlocale(locale.LC_ALL, f'{code}.UTF-8')
-
-
-class Result(Enum):
-    SUCCESS = 1
-    RETRY = 2
-    COOLDOWN = 3
-    EXCEPTION = 4
 
 
 class Use(Enum):
@@ -237,7 +231,7 @@ class VisaScheduler:
     def get_driver():
         dr = None
         if USE == Use.LOCAL.value:
-            dr = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()))
+            dr = webdriver.Chrome(ChromeDriverManager().install())
         elif USE == Use.AWS.value:
             chrome_options = webdriver.ChromeOptions()
             chrome_options.binary_location = "/opt/chrome/chrome"
@@ -350,8 +344,3 @@ class VisaScheduler:
             result = Result.EXCEPTION
 
         return result
-
-
-def lambda_handler(event=None, context=None):
-    handler = VisaScheduler()
-    print(handler.main())
