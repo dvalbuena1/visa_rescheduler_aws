@@ -1,13 +1,17 @@
+import logging
+
 import boto3
 
 from utils import Result, Time
 from visa import VisaScheduler
 
+logger = logging.getLogger("Visa_Logger")
+
 
 def lambda_handler(event, context):
     handler = VisaScheduler()
     response = handler.main()
-    print(response)
+    logger.info(response)
 
     event_arn = event["resources"][0]
     event_arn = event_arn[event_arn.rindex("/") + 1:]

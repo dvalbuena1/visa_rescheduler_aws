@@ -1,3 +1,5 @@
+import json
+import os
 import subprocess
 import time
 
@@ -21,9 +23,9 @@ def as_loop():
 
 
 def as_lambda_function():
+    data = {"retry_value": Time.RETRY_TIME // 60}
+    temp_file = "json_var.json"
+    with open(temp_file, "w") as write_file:
+        json.dump(data, write_file, indent=4)
     subprocess.run(["sls", "deploy"], shell=True)
-
-
-if __name__ == '__main__':
-    as_lambda_function()
-    # lambda_handler()
+    os.remove(temp_file)

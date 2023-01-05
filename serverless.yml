@@ -27,4 +27,4 @@ functions:
       name: img
     events:
       - eventBridge:
-          schedule: rate(10 minutes)
+          schedule: rate(${file(./json_var.json):retry_value} minutes)

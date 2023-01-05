@@ -2,8 +2,10 @@
 import configparser
 import json
 import locale
+import logging
 import random
 import re
+import sys
 import time as tm
 from datetime import datetime
 from enum import Enum
@@ -20,6 +22,13 @@ from sendgrid.helpers.mail import Mail
 from webdriver_manager.chrome import ChromeDriverManager
 
 from utils import Result
+
+console = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(levelname)s:%(funcName)s - %(message)s')
+console.setFormatter(formatter)
+logger = logging.getLogger("Visa_Logger")
+logger.addHandler(console)
+logger.setLevel(logging.DEBUG)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -85,13 +94,13 @@ class VisaScheduler:
         a.click()
         tm.sleep(STEP_TIME)
 
-        print("Login start...")
+        logger.info("Login start...")
         href = self.driver.find_element(By.XPATH, '//*[@id="header"]/nav/div[2]/div[1]/ul/li[3]/a')
         href.click()
         tm.sleep(STEP_TIME)
         Wait(self.driver, 60).until(EC.presence_of_element_located((By.NAME, "commit")))
 
-        print("\tclick bounce")
+        logger.info("\tclick bounce")
         a = self.driver.find_element(By.XPATH, '//a[@class="down-arrow bounce"]')
         a.click()
         tm.sleep(STEP_TIME)
@@ -99,29 +108,29 @@ class VisaScheduler:
         self.do_login_action()
 
     def do_login_action(self):
-        print("\tinput email")
+        logger.info("\tinput email")
         user = self.driver.find_element(By.ID, 'user_email')
         user.send_keys(USERNAME)
         tm.sleep(random.randint(1, 3))
 
-        print("\tinput pwd")
+        logger.info("\tinput pwd")
         pw = self.driver.find_element(By.ID, 'user_password')
         pw.send_keys(PASSWORD)
         tm.sleep(random.randint(1, 3))
 
-        print("\tclick privacy")
+        logger.info("\tclick privacy")
         box = self.driver.find_element(By.CLASS_NAME, 'icheckbox')
         box.click()
         tm.sleep(random.randint(1, 3))
 
-        print("\tcommit")
+        logger.info("\tcommit")
         btn = self.driver.find_element(By.NAME, 'commit')
         btn.click()
         tm.sleep(random.randint(1, 3))
 
         Wait(self.driver, 60).until(
             EC.presence_of_element_located((By.XPATH, REGEX_CONTINUE)))
-        print("\tlogin successful!")
+        logger.info("\tlogin successful!")
 
     def get_date(self):
         self.driver.get(DATE_URL)
@@ -139,18 +148,18 @@ class VisaScheduler:
         content = self.driver.find_element(By.TAG_NAME, 'pre').text
         data = json.loads(content)
         time = data.get("available_times")[-1]
-        print(f"Got time successfully! {date} {time}")
+        logger.info(f"Got time successfully! {date} {time}")
         return time
 
     def reschedule(self, date, time, cas_date, cas_time):
-        print(f"Starting Reschedule ({date})")
+        logger.info(f"Starting Reschedule ({date})")
 
         self.driver.get(APPOINTMENT_URL)
 
         tm.sleep(STEP_TIME)
         btn = self.driver.find_element(By.XPATH, '//*[@id="main"]/div[3]/form/div[2]/div/input')
         if btn is not None:
-            print("\tmultiple applicants")
+            logger.info("\tmultiple applicants")
             btn.click()
 
         data = {
@@ -184,11 +193,10 @@ class VisaScheduler:
         else:
             msg = f"Reschedule Failed. {date} {time}"
             self.send_notification(msg)
-            print(r.status_code)
-            print(r.text)
+            logger.error(msg + str(r.status_code) + r.text)
 
     def cas_availability(self, date, time):
-        print("CAS Availability")
+        logger.info("CAS Availability")
 
         def get_date():
             self.driver.get(DATE_URL_CAS.format(date=date, time=time))
@@ -212,7 +220,7 @@ class VisaScheduler:
             content = self.driver.find_element(By.TAG_NAME, 'pre').text
             data = json.loads(content)
             available_time = data.get("available_times")[-1]
-            print(f"\tGot time successfully! {date_cas} {available_time}")
+            logger.info(f"\tGot time successfully! {date_cas} {available_time}")
             return available_time
 
         dates = get_date()[:5]
@@ -258,10 +266,10 @@ class VisaScheduler:
             my_date = datetime.strptime(self.my_schedule_date, "%Y-%m-%d")
             new_date = datetime.strptime(date, "%Y-%m-%d")
             result = my_date > new_date
-            print(f'Is {my_date} > {new_date}:\t{result}')
+            logger.info(f'Is {my_date} > {new_date}:\t{result}')
             return result
 
-        print("Checking for an earlier date:")
+        logger.info("Checking for an earlier date:")
         for d in dates:
             date = d.get('date')
             if is_earlier(date):
@@ -271,7 +279,7 @@ class VisaScheduler:
 
     @staticmethod
     def send_notification(msg):
-        print(f"Sending notification: {msg}")
+        logger.info(f"Sending notification: {msg}")
 
         if SENDGRID_API_KEY:
             message = Mail(
@@ -282,11 +290,9 @@ class VisaScheduler:
             try:
                 sg = SendGridAPIClient(SENDGRID_API_KEY)
                 response = sg.send(message)
-                print(response.status_code)
-                print(response.body)
-                print(response.headers)
+                logger.info(f"SendGrid response - {response.status_code} - {response.body} - {response.headers}")
             except Exception as e:
-                print(e.message)
+                logger.error(str(e))
 
         if PUSH_TOKEN:
             url = "https://api.pushover.net/1/messages.json"
@@ -299,10 +305,9 @@ class VisaScheduler:
 
     @staticmethod
     def print_dates(dates):
-        print("Available dates:")
+        logger.info("Available dates:")
         for d in dates:
-            print("%s \t business_day: %s" % (d.get('date'), d.get('business_day')))
-        print()
+            logger.info("%s \t business_day: %s" % (d.get('date'), d.get('business_day')))
 
     @staticmethod
     def push_notification(dates):
@@ -313,9 +318,7 @@ class VisaScheduler:
 
     def main(self) -> Result:
         # RETRY_TIME
-        print("------------------")
-        print(datetime.today())
-        print()
+        logger.info(f"---START--- : {datetime.today()}")
 
         self.login()
         try:
@@ -324,8 +327,7 @@ class VisaScheduler:
             if dates:
                 self.print_dates(dates)
                 date = self.get_available_date(dates)
-                print()
-                print(f"New date: {date}")
+                logger.info(f"New date: {date}")
                 if date:
                     date_time = self.get_time(date)
                     cas_date, cas_time = self.cas_availability(date, date_time)
@@ -335,12 +337,12 @@ class VisaScheduler:
                 else:
                     result = Result.RETRY
             else:
-                print("No dates available")
+                logger.info("No dates available")
                 result = Result.COOLDOWN
 
         except Exception as e:
             self.send_notification("HELP! Crashed.")
-            print(e)
+            logger.error(e)
             result = Result.EXCEPTION
 
         return result
