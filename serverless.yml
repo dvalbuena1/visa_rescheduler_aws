@@ -2,6 +2,7 @@ service: visa-rescheduler-lambda
 
 provider:
   name: aws
+  logRetentionInDays: 5
   iam:
     role:
       statements:
