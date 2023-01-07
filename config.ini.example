@@ -8,7 +8,7 @@ COUNTRY_CODE = es-co
 ; Bogotá
 FACILITY_ID = 25
 ; Bogotá
-CAS_ID = 26
+ASC_ID = 26
 
 [CHROMEDRIVER]
 ; Way to use selenium LOCAL, AWS or REMOTE

@@ -38,7 +38,7 @@ PASSWORD = config['USVISA']['PASSWORD']
 SCHEDULE_ID = config['USVISA']['SCHEDULE_ID']
 COUNTRY_CODE = config['USVISA']['COUNTRY_CODE']
 FACILITY_ID = config['USVISA']['FACILITY_ID']
-CAS_ID = config['USVISA']['CAS_ID']
+ASC_ID = config['USVISA']['ASC_ID']
 
 SENDGRID_API_KEY = config['SENDGRID']['SENDGRID_API_KEY']
 PUSH_TOKEN = config['PUSHOVER']['PUSH_TOKEN']
@@ -54,8 +54,8 @@ STEP_TIME = 0.5  # time between steps (interactions with forms): 0.5 seconds
 DATE_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/days/{FACILITY_ID}.json?appointments[expedite]=false"
 TIME_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{FACILITY_ID}.json?date={{date}}&appointments[expedite]=false"
 APPOINTMENT_URL = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment"
-DATE_URL_CAS = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/days/{CAS_ID}.json?&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
-TIME_URL_CAS = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{CAS_ID}.json?date={{date_cas}}&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
+DATE_URL_ASC = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/days/{ASC_ID}.json?&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
+TIME_URL_ASC = f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv/schedule/{SCHEDULE_ID}/appointment/times/{ASC_ID}.json?date={{date_asc}}&consulate_id={FACILITY_ID}&consulate_date={{date}}&consulate_time={{time}}&appointments[expedite]=false"
 
 code = COUNTRY_CODE.split("-")
 code[1] = code[1].upper()
@@ -151,7 +151,7 @@ class VisaScheduler:
         logger.info(f"Got time successfully! {date} {time}")
         return time
 
-    def reschedule(self, date, time, cas_date, cas_time):
+    def reschedule(self, date, time, asc_date, asc_time):
         logger.info(f"Starting Reschedule ({date})")
 
         self.driver.get(APPOINTMENT_URL)
@@ -175,9 +175,9 @@ class VisaScheduler:
             "appointments[consulate_appointment][facility_id]": FACILITY_ID,
             "appointments[consulate_appointment][date]": date,
             "appointments[consulate_appointment][time]": time,
-            "appointments[asc_appointment][facility_id]": CAS_ID,
-            "appointments[asc_appointment][date]": cas_date,
-            "appointments[asc_appointment][time]": cas_time
+            "appointments[asc_appointment][facility_id]": ASC_ID,
+            "appointments[asc_appointment][date]": asc_date,
+            "appointments[asc_appointment][time]": asc_time
         }
 
         headers = {
@@ -195,11 +195,11 @@ class VisaScheduler:
             self.send_notification(msg)
             logger.error(msg + str(r.status_code) + r.text)
 
-    def cas_availability(self, date, time):
-        logger.info("CAS Availability")
+    def asc_availability(self, date, time):
+        logger.info("ASC Availability")
 
         def get_date():
-            self.driver.get(DATE_URL_CAS.format(date=date, time=time))
+            self.driver.get(DATE_URL_ASC.format(date=date, time=time))
             if not self.is_logged_in():
                 self.login()
                 return get_date()
@@ -214,13 +214,13 @@ class VisaScheduler:
                 if VisaScheduler.MY_CONDITION(month, day):
                     return date
 
-        def get_time(date_cas):
-            time_url = TIME_URL_CAS.format(date_cas=date_cas, date=date, time=time)
+        def get_time(date_asc):
+            time_url = TIME_URL_ASC.format(date_asc=date_asc, date=date, time=time)
             self.driver.get(time_url)
             content = self.driver.find_element(By.TAG_NAME, 'pre').text
             data = json.loads(content)
             available_time = data.get("available_times")[-1]
-            logger.info(f"\tGot time successfully! {date_cas} {available_time}")
+            logger.info(f"\tGot time successfully! {date_asc} {available_time}")
             return available_time
 
         dates = get_date()[:5]
@@ -330,8 +330,8 @@ class VisaScheduler:
                 logger.info(f"New date: {date}")
                 if date:
                     date_time = self.get_time(date)
-                    cas_date, cas_time = self.cas_availability(date, date_time)
-                    self.reschedule(date, date_time, cas_date, cas_time)
+                    asc_date, asc_time = self.asc_availability(date, date_time)
+                    self.reschedule(date, date_time, asc_date, asc_time)
                     VisaScheduler.push_notification(dates)
                     result = Result.SUCCESS
                 else:
