@@ -39,3 +39,5 @@ That's it!
 ## Acknowledgement
 
 Thanks to @uxDaniel and all those who have contributed to this project.
+
+[Original repo](https://github.com/uxDaniel/visa_rescheduler)
