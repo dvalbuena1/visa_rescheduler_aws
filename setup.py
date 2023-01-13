@@ -4,10 +4,10 @@ import subprocess
 import time
 
 from utils import Time
-from visa import VisaScheduler, Result
 
 
 def as_loop():
+    from visa import VisaScheduler, Result
     while 1:
         handler = VisaScheduler()
         result = handler.main()

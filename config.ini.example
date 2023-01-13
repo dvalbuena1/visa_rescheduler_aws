@@ -2,6 +2,8 @@
 ; Account and current appointment info from https://ais.usvisa-info.com
 USERNAME = example@example.com
 PASSWORD = xxxxxxxxxx
+; SCHEDULE_ID is in URL https://ais.usvisa-info.com/es-co/niv/schedule/SCHEDULE_ID/continue_actions
+; SCHEDULE_ID is not IVR Account Number
 SCHEDULE_ID = 99999999
 ; Spanish - Colombia
 COUNTRY_CODE = es-co
