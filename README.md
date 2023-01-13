@@ -18,7 +18,7 @@ With the extension to be deployed in AWS as a Lambda function
 
 - Docker installed (to create the image)
 - [AWS credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html) configured
-- [Serverless framework](https://www.serverless.com/) installed (to deploy the image)
+- [Serverless framework](https://www.serverless.com/framework/docs/getting-started#installation) installed (to deploy the image)
 
 ## Initial Setup
 
