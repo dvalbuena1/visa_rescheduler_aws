@@ -39,6 +39,7 @@ SCHEDULE_ID = config['USVISA']['SCHEDULE_ID']
 COUNTRY_CODE = config['USVISA']['COUNTRY_CODE']
 FACILITY_ID = config['USVISA']['FACILITY_ID']
 ASC_ID = config['USVISA']['ASC_ID']
+NEED_ASC = config['USVISA'].getboolean('NEED_ASC')
 
 SENDGRID_API_KEY = config['SENDGRID']['SENDGRID_API_KEY']
 PUSH_TOKEN = config['PUSHOVER']['PUSH_TOKEN']
@@ -151,7 +152,7 @@ class VisaScheduler:
         logger.info(f"Got time successfully! {date} {time}")
         return time
 
-    def reschedule(self, date, time, asc_date, asc_time):
+    def reschedule(self, date, time, asc_date=None, asc_time=None):
         logger.info(f"Starting Reschedule ({date})")
 
         self.driver.get(APPOINTMENT_URL)
@@ -175,10 +176,15 @@ class VisaScheduler:
             "appointments[consulate_appointment][facility_id]": FACILITY_ID,
             "appointments[consulate_appointment][date]": date,
             "appointments[consulate_appointment][time]": time,
-            "appointments[asc_appointment][facility_id]": ASC_ID,
-            "appointments[asc_appointment][date]": asc_date,
-            "appointments[asc_appointment][time]": asc_time
         }
+
+        if NEED_ASC:
+            asc_data = {
+                "appointments[asc_appointment][facility_id]": ASC_ID,
+                "appointments[asc_appointment][date]": asc_date,
+                "appointments[asc_appointment][time]": asc_time
+            }
+            data.update(asc_data)
 
         headers = {
             "User-Agent": self.driver.execute_script("return navigator.userAgent;"),
@@ -188,12 +194,14 @@ class VisaScheduler:
 
         r = requests.post(APPOINTMENT_URL, headers=headers, data=data)
         if r.status_code == 200:
-            msg = f"Rescheduled Successfully! {date} {time}"
+            msg = f"Rescheduled Successfully! {date} {time}" + f", ASC: {asc_date} {asc_time}" if NEED_ASC else ""
             self.send_notification(msg)
+            return Result.SUCCESS
         else:
-            msg = f"Reschedule Failed. {date} {time}"
+            msg = f"Reschedule Failed. {date} {time}" + f", ASC: {asc_date} {asc_time}" if NEED_ASC else ""
             self.send_notification(msg)
             logger.error(msg + str(r.status_code) + r.text)
+            return Result.RETRY
 
     def asc_availability(self, date, time):
         logger.info("ASC Availability")
@@ -225,7 +233,9 @@ class VisaScheduler:
 
         dates = get_date()[:5]
         available_date = get_available_date(dates)
-        available_time = get_time(available_date)
+        available_time = None
+        if available_date:
+            available_time = get_time(available_date)
 
         return available_date, available_time
 
@@ -309,13 +319,6 @@ class VisaScheduler:
         for d in dates:
             logger.info("%s \t business_day: %s" % (d.get('date'), d.get('business_day')))
 
-    @staticmethod
-    def push_notification(dates):
-        msg = "date: "
-        for d in dates:
-            msg = msg + d.get('date') + '; '
-        VisaScheduler.send_notification(msg)
-
     def main(self) -> Result:
         # RETRY_TIME
         logger.info(f"---START--- : {datetime.today()}")
@@ -330,14 +333,20 @@ class VisaScheduler:
                 logger.info(f"New date: {date}")
                 if date:
                     date_time = self.get_time(date)
-                    asc_date, asc_time = self.asc_availability(date, date_time)
-                    self.reschedule(date, date_time, asc_date, asc_time)
-                    VisaScheduler.push_notification(dates)
-                    result = Result.SUCCESS
+
+                    if NEED_ASC:
+                        asc_date, asc_time = self.asc_availability(date, date_time)
+                        if asc_date and asc_time:
+                            result = self.reschedule(date, date_time, asc_date, asc_time)
+                        else:
+                            logger.info("No dates available on ASC")
+                            result = Result.COOLDOWN
+                    else:
+                        result = self.reschedule(date, date_time)
                 else:
                     result = Result.RETRY
             else:
-                logger.info("No dates available")
+                logger.info("No dates available on FACILITY")
                 result = Result.COOLDOWN
 
         except Exception as e:

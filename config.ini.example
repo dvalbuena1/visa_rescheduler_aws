@@ -5,6 +5,8 @@ PASSWORD = xxxxxxxxxx
 ; SCHEDULE_ID is in URL https://ais.usvisa-info.com/es-co/niv/schedule/SCHEDULE_ID/continue_actions
 ; SCHEDULE_ID is not IVR Account Number
 SCHEDULE_ID = 99999999
+; In case you required an appointment on ASC
+NEED_ASC = True
 ; Spanish - Colombia
 COUNTRY_CODE = es-co
 ; Bogotá
