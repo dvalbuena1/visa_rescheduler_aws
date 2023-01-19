@@ -17,6 +17,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as Wait
+from selenium.common.exceptions import NoSuchElementException
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from webdriver_manager.chrome import ChromeDriverManager
@@ -157,10 +158,13 @@ class VisaScheduler:
         self.driver.get(APPOINTMENT_URL)
 
         tm.sleep(STEP_TIME)
-        btn = self.driver.find_element(By.XPATH, '//*[@id="main"]/div[3]/form/div[2]/div/input')
-        if btn is not None:
+        try:
+            btn = self.driver.find_element(By.XPATH, '//*[@id="main"]/div[3]/form/div[2]/div/input')
+
             logger.info("\tmultiple applicants")
             btn.click()
+        except NoSuchElementException:
+            logger.info("\tsingle applicant")
 
         data = {
             "utf8": self.driver.find_element(by=By.NAME, value='utf8').get_attribute('value'),
