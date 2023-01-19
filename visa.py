@@ -81,8 +81,7 @@ class VisaScheduler:
         return True  # No custom condition wanted for the new scheduled date
 
     def get_my_schedule_date(self):
-        appointment = self.driver.find_element(By.XPATH,
-                                               '//*[@id="main"]/div[2]/div[3]/div[1]/div/div[1]/div[2]/p[1]').text
+        appointment = self.driver.find_element(By.CLASS_NAME, 'consular-appt').text
         regex = r".+: (.+,.+),.+"
         date = re.search(regex, appointment).group(1)
         self.my_schedule_date = datetime.strptime(date, "%d %B, %Y").strftime("%Y-%m-%d")
