@@ -76,9 +76,14 @@ class VisaScheduler:
         self.driver = self.get_driver()
         self.my_schedule_date = None
 
-    # def MY_CONDITION(month, day): return int(month) == 11 and int(day) >= 5
+    # def MY_CONDITION_DATE(year, month, day): return int(month) == 11 and int(day) >= 5 and int(year) == 2023
     @staticmethod
-    def MY_CONDITION(month, day):
+    def MY_CONDITION_DATE(year, month, day):
+        return True  # No custom condition wanted for the new scheduled date
+
+    # def MY_CONDITION_TIME(hour, minute): return int(hour) >= 8 and int(hour) <= 12 and int(minute) == 0
+    @staticmethod
+    def MY_CONDITION_TIME(hour, minute):
         return True  # No custom condition wanted for the new scheduled date
 
     def get_my_schedule_date(self):
@@ -148,9 +153,12 @@ class VisaScheduler:
         self.driver.get(time_url)
         content = self.driver.find_element(By.TAG_NAME, 'pre').text
         data = json.loads(content)
-        time = data.get("available_times")[-1]
-        logger.info(f"Got time successfully! {date} {time}")
-        return time
+        times = data.get("available_times")[::-1]
+        for t in times:
+            hour, minute = t.split(":")
+            if self.MY_CONDITION_TIME(hour, minute):
+                logger.info(f"Got time successfully! {date} {t}")
+                return t
 
     def reschedule(self, date, time, asc_date=None, asc_time=None):
         logger.info(f"Starting Reschedule ({date})")
@@ -221,8 +229,8 @@ class VisaScheduler:
         def get_available_date(dates):
             for d in dates:
                 date = d.get('date')
-                _, month, day = date.split('-')
-                if VisaScheduler.MY_CONDITION(month, day):
+                year, month, day = date.split('-')
+                if VisaScheduler.MY_CONDITION_DATE(year, month, day):
                     return date
 
         def get_time(date_asc):
@@ -230,17 +238,26 @@ class VisaScheduler:
             self.driver.get(time_url)
             content = self.driver.find_element(By.TAG_NAME, 'pre').text
             data = json.loads(content)
-            available_time = data.get("available_times")[-1]
-            logger.info(f"\tGot time successfully! {date_asc} {available_time}")
-            return available_time
+            available_times = data.get("available_times")[-1]
+            for t in available_times:
+                hour, minute = t.split(":")
+                if self.MY_CONDITION_TIME(hour, minute):
+                    logger.info(f"Got time successfully! {date_asc} {t}")
+                    return t
 
         dates = get_date()[:5]
-        available_date = get_available_date(dates)
-        available_time = None
-        if available_date:
-            available_time = get_time(available_date)
+        if not dates:
+            return False, (None, None)
 
-        return available_date, available_time
+        available_date = get_available_date(dates)
+        if not available_date:
+            return True, (None, None)
+
+        available_time = get_time(available_date)
+        if not available_time:
+            return True, (available_date, None)
+
+        return True, (available_date, available_time)
 
     def is_logged_in(self):
         content = self.driver.page_source
@@ -287,7 +304,7 @@ class VisaScheduler:
             date = d.get('date')
             if is_earlier(date):
                 _, month, day = date.split('-')
-                if VisaScheduler.MY_CONDITION(month, day):
+                if VisaScheduler.MY_CONDITION_DATE(month, day):
                     return date
 
     @staticmethod
@@ -330,27 +347,48 @@ class VisaScheduler:
         try:
             self.get_my_schedule_date()
             dates = self.get_date()[:5]
-            if dates:
-                self.print_dates(dates)
-                date = self.get_available_date(dates)
-                logger.info(f"New date: {date}")
-                if date:
-                    date_time = self.get_time(date)
-
-                    if NEED_ASC:
-                        asc_date, asc_time = self.asc_availability(date, date_time)
-                        if asc_date and asc_time:
-                            result = self.reschedule(date, date_time, asc_date, asc_time)
-                        else:
-                            logger.info("No dates available on ASC")
-                            result = Result.COOLDOWN
-                    else:
-                        result = self.reschedule(date, date_time)
-                else:
-                    result = Result.RETRY
-            else:
+            if not dates:
                 logger.info("No dates available on FACILITY")
                 result = Result.COOLDOWN
+                return result
+
+            self.print_dates(dates)
+            date = self.get_available_date(dates)
+
+            if not date:
+                # No dates that fulfill MY_CONDITION_DATE or early enough
+                result = Result.RETRY
+                return result
+
+            date_time = self.get_time(date)
+
+            if not date_time:
+                # No times that fulfill MY_CONDITION_TIME
+                result = Result.RETRY
+                return result
+
+            logger.info(f"New date: {date} {date_time}")
+
+            if NEED_ASC:
+                found, asc_date = self.asc_availability(date, date_time)
+                if not found:
+                    logger.info("No dates available on ASC")
+                    result = Result.COOLDOWN
+                    return result
+
+                if not asc_date[0] and not asc_date[1]:
+                    # No dates that fulfill MY_CONDITION_DATE or early enough
+                    result = Result.RETRY
+                    return result
+
+                if not asc_date[1]:
+                    # No times that fulfill MY_CONDITION_TIME
+                    result = Result.RETRY
+                    return result
+
+                result = self.reschedule(date, date_time, asc_date[0], asc_date[1])
+            else:
+                result = self.reschedule(date, date_time)
 
         except Exception as e:
             self.send_notification("HELP! Crashed.")
