@@ -303,8 +303,8 @@ class VisaScheduler:
         for d in dates:
             date = d.get('date')
             if is_earlier(date):
-                _, month, day = date.split('-')
-                if VisaScheduler.MY_CONDITION_DATE(month, day):
+                year, month, day = date.split('-')
+                if VisaScheduler.MY_CONDITION_DATE(year, month, day):
                     return date
 
     @staticmethod
@@ -377,7 +377,7 @@ class VisaScheduler:
                     return result
 
                 if not asc_date[0] and not asc_date[1]:
-                    # No dates that fulfill MY_CONDITION_DATE or early enough
+                    # No dates that fulfill MY_CONDITION_DATE
                     result = Result.RETRY
                     return result
 
