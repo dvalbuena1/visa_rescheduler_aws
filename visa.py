@@ -238,7 +238,7 @@ class VisaScheduler:
             self.driver.get(time_url)
             content = self.driver.find_element(By.TAG_NAME, 'pre').text
             data = json.loads(content)
-            available_times = data.get("available_times")[-1]
+            available_times = data.get("available_times")[::-1]
             for t in available_times:
                 hour, minute = t.split(":")
                 if self.MY_CONDITION_TIME(hour, minute):
@@ -305,7 +305,7 @@ class VisaScheduler:
             if is_earlier(date):
                 year, month, day = date.split('-')
                 if VisaScheduler.MY_CONDITION_DATE(year, month, day):
-                    return date
+            return date
 
     @staticmethod
     def send_notification(msg):
@@ -343,8 +343,8 @@ class VisaScheduler:
         # RETRY_TIME
         logger.info(f"---START--- : {datetime.today()}")
 
-        self.login()
         try:
+            self.login()
             self.get_my_schedule_date()
             dates = self.get_date()[:5]
             if not dates:
