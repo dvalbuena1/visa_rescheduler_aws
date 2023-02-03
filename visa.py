@@ -305,7 +305,7 @@ class VisaScheduler:
             if is_earlier(date):
                 year, month, day = date.split('-')
                 if VisaScheduler.MY_CONDITION_DATE(year, month, day):
-            return date
+                    return date
 
     @staticmethod
     def send_notification(msg):
