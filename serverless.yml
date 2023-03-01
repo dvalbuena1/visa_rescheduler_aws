@@ -8,7 +8,16 @@ provider:
       statements:
         - Effect: Allow
           Action: 'events:PutRule'
-          Resource: "arn:aws:events:*:*:rule/visa-rescheduler-lambda*"
+          Resource:
+            - 'Fn::Join':
+              - ''
+              - - 'arn:aws:events:'
+                - Ref: AWS::Region
+                - ':'
+                - Ref: AWS::AccountId
+                - ':rule/'
+                - ${self:service}
+                - '*'
 
 
   stage: ${opt:stage, 'prod'}
