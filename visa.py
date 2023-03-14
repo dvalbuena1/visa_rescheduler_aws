@@ -93,8 +93,6 @@ class VisaScheduler:
         self.my_schedule_date = datetime.strptime(date, "%d %B, %Y").strftime("%Y-%m-%d")
 
     def login(self):
-        # Bypass reCAPTCHA
-        self.driver.get(f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv")
         tm.sleep(STEP_TIME)
         a = self.driver.find_element(By.XPATH, '//a[@class="down-arrow bounce"]')
         a.click()
@@ -344,6 +342,16 @@ class VisaScheduler:
         logger.info(f"---START--- : {datetime.today()}")
 
         try:
+            # Bypass reCAPTCHA
+            self.driver.get(f"https://ais.usvisa-info.com/{COUNTRY_CODE}/niv")
+
+            # Is the page under maintenance?
+            is_under_maintenance = self.driver.find_element(By.CSS_SELECTOR, "body > div.construction-background")
+            if is_under_maintenance:
+                logger.info("The portal is currently under maintenance")
+                result = Result.RETRY
+                return result
+            
             self.login()
             self.get_my_schedule_date()
             dates = self.get_date()[:5]
