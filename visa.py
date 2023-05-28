@@ -101,7 +101,7 @@ class VisaScheduler:
         tm.sleep(STEP_TIME)
 
         logger.info("Login start...")
-        href = self.driver.find_element(By.XPATH, '//*[@id="header"]/nav/div[2]/div[1]/ul/li[3]/a')
+        href = self.driver.find_element(By.XPATH, '//*[@id="main"]/div[2]/div[3]/div[2]/div[1]/div/a')
         href.click()
         tm.sleep(STEP_TIME)
         Wait(self.driver, 60).until(EC.presence_of_element_located((By.NAME, "commit")))
