@@ -144,8 +144,12 @@ class VisaScheduler:
             self.login()
             return self.get_date()
         else:
-            content = self.driver.find_element(By.TAG_NAME, 'pre').text
-            date = json.loads(content)
+            try:
+                content = self.driver.find_element(By.TAG_NAME, 'pre').text
+                date = json.loads(content)
+            except NoSuchElementException:
+                date = []
+
             return date
 
     def get_time(self, date):

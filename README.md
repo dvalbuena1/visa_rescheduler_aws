@@ -32,7 +32,7 @@ With the extension to be deployed in AWS as a Lambda function
 
 ### AWS
 - Do not need to install `requirements.txt`
-- Simply run `python -c "import setup; setup.as_lambda_function()"`
+- Just run `python -c "import setup; setup.as_lambda_function()"`
 - In case you want to stop or delete the function run `sls delete`
 
 
