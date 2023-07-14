@@ -139,17 +139,19 @@ class VisaScheduler:
         logger.info("\tlogin successful!")
 
     def get_date(self):
-        self.driver.get(DATE_URL)
         if not self.is_logged_in():
             self.login()
             return self.get_date()
         else:
-            try:
-                content = self.driver.find_element(By.TAG_NAME, 'pre').text
-                date = json.loads(content)
-            except NoSuchElementException:
-                date = []
-
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With": "XMLHttpRequest",
+                "User-Agent": self.driver.execute_script("return navigator.userAgent;"),
+                "Referer": APPOINTMENT_URL,
+                "Cookie": "_yatri_session=" + self.driver.get_cookie("_yatri_session")["value"]
+            }
+            r = requests.get(DATE_URL, headers=headers)
+            date = r.json()
             return date
 
     def get_time(self, date):
@@ -264,8 +266,8 @@ class VisaScheduler:
         return True, (available_date, available_time)
 
     def is_logged_in(self):
-        content = self.driver.page_source
-        if content.find("error") != -1:
+        cookie = self.driver.get_cookie("_yatri_session")["value"]
+        if len(cookie) <= 350:
             return False
         return True
 
