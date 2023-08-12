@@ -86,6 +86,15 @@ class VisaScheduler:
     def MY_CONDITION_TIME(hour, minute):
         return True  # No custom condition wanted for the new scheduled date
 
+    def get_header(self):
+        return {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": self.driver.execute_script("return navigator.userAgent;"),
+            "Referer": APPOINTMENT_URL,
+            "Cookie": "_yatri_session=" + self.driver.get_cookie("_yatri_session")["value"]
+        }
+
     def get_my_schedule_date(self):
         appointment = self.driver.find_element(By.CLASS_NAME, 'consular-appt').text
         regex = r".+: (.+,.+),.+"
@@ -143,22 +152,14 @@ class VisaScheduler:
             self.login()
             return self.get_date()
         else:
-            headers = {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "X-Requested-With": "XMLHttpRequest",
-                "User-Agent": self.driver.execute_script("return navigator.userAgent;"),
-                "Referer": APPOINTMENT_URL,
-                "Cookie": "_yatri_session=" + self.driver.get_cookie("_yatri_session")["value"]
-            }
-            r = requests.get(DATE_URL, headers=headers)
+            r = requests.get(DATE_URL, headers=self.get_header())
             date = r.json()
             return date
 
     def get_time(self, date):
         time_url = TIME_URL.format(date=date)
-        self.driver.get(time_url)
-        content = self.driver.find_element(By.TAG_NAME, 'pre').text
-        data = json.loads(content)
+        r = requests.get(time_url, headers=self.get_header())
+        data = r.json()
         times = data.get("available_times")[::-1]
         for t in times:
             hour, minute = t.split(":")
@@ -224,13 +225,13 @@ class VisaScheduler:
         logger.info("ASC Availability")
 
         def get_date():
-            self.driver.get(DATE_URL_ASC.format(date=date, time=time))
             if not self.is_logged_in():
                 self.login()
                 return get_date()
             else:
-                content = self.driver.find_element(By.TAG_NAME, 'pre').text
-                return json.loads(content)
+                date_url_asc = DATE_URL_ASC.format(date=date, time=time)
+                r = requests.get(date_url_asc, headers=self.get_header())
+                return r.json()
 
         def get_available_date(dates):
             for d in dates:
@@ -241,9 +242,8 @@ class VisaScheduler:
 
         def get_time(date_asc):
             time_url = TIME_URL_ASC.format(date_asc=date_asc, date=date, time=time)
-            self.driver.get(time_url)
-            content = self.driver.find_element(By.TAG_NAME, 'pre').text
-            data = json.loads(content)
+            r = requests.get(time_url, headers=self.get_header())
+            data = r.json()
             available_times = data.get("available_times")[::-1]
             for t in available_times:
                 hour, minute = t.split(":")
