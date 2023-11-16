@@ -96,7 +96,11 @@ class VisaScheduler:
         }
 
     def get_my_schedule_date(self):
-        appointment = self.driver.find_element(By.CLASS_NAME, 'consular-appt').text
+        logger.info("Getting my schedule date...")
+        element = self.driver.find_element(By.XPATH,
+                                           '//a[contains(@href, "%s")]/ancestor::div[contains(@class, "application")]' % SCHEDULE_ID)
+
+        appointment = element.find_element(By.CLASS_NAME, 'consular-appt').text
         regex = r".+: (.+,.+),.+"
         date = re.search(regex, appointment).group(1)
         self.my_schedule_date = datetime.strptime(date, "%d %B, %Y").strftime("%Y-%m-%d")
@@ -152,6 +156,7 @@ class VisaScheduler:
             self.login()
             return self.get_date()
         else:
+            logger.info("Getting dates...")
             r = requests.get(DATE_URL, headers=self.get_header())
             date = r.json()
             return date
@@ -182,7 +187,6 @@ class VisaScheduler:
             logger.info("\tsingle applicant")
 
         data = {
-            "utf8": self.driver.find_element(by=By.NAME, value='utf8').get_attribute('value'),
             "authenticity_token": self.driver.find_element(by=By.NAME, value='authenticity_token').get_attribute(
                 'value'),
             "confirmed_limit_message": self.driver.find_element(by=By.NAME,

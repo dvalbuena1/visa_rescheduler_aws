@@ -7,15 +7,31 @@ provider:
     role:
       statements:
         - Effect: Allow
-          Action: 'events:PutRule'
+          Action: 'iam:PassRole'
+          Resource:
+            - 'Fn::Join':
+                - ''
+                - - 'arn:aws:iam::'
+                  - Ref: AWS::AccountId
+                  - ':role/'
+                  - ${self:service}
+                  - '-'
+                  - ${self:provider.stage}
+                  - '-'
+                  - Ref: AWS::Region
+                  - '-lambdaRole'
+        - Effect: Allow
+          Action:
+            - 'scheduler:GetSchedule'
+            - 'scheduler:UpdateSchedule'
           Resource:
             - 'Fn::Join':
               - ''
-              - - 'arn:aws:events:'
+              - - 'arn:aws:scheduler:'
                 - Ref: AWS::Region
                 - ':'
                 - Ref: AWS::AccountId
-                - ':rule/'
+                - ':schedule/default/'
                 - ${self:service}
                 - '*'
 
@@ -36,5 +52,6 @@ functions:
     image:
       name: img
     events:
-      - eventBridge:
-          schedule: rate(${file(./json_var.json):retry_value, '10'} minutes)
+      - schedule:
+          method: scheduler
+          rate: rate(${file(./json_var.json):retry_value, '10'} minutes)

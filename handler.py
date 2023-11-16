@@ -15,7 +15,7 @@ def lambda_handler(event, context):
 
     event_arn = event["resources"][0]
     event_arn = event_arn[event_arn.rindex("/") + 1:]
-    events_client = boto3.client('events')
+    scheduler_client = boto3.client('scheduler')
     rate = Time.RETRY_TIME
 
     if response == Result.COOLDOWN:
@@ -23,5 +23,6 @@ def lambda_handler(event, context):
     elif response == Result.EXCEPTION:
         rate = Time.EXCEPTION_TIME
 
-    events_client.put_rule(Name=event_arn,
-                           ScheduleExpression=f"rate({rate // 60} minutes)")
+    response = scheduler_client.get_schedule(Name=event_arn)
+    scheduler_client.update_schedule(FlexibleTimeWindow=response["FlexibleTimeWindow"], Name=event_arn,
+                                     ScheduleExpression=f"rate({rate // 60} minutes)", Target=response["Target"])
